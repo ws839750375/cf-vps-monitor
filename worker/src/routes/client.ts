@@ -461,17 +461,17 @@ function isCountryCodeRegion(value: string): boolean {
 }
 
 function preferredRegion(...values: unknown[]): string {
-  const REGION_OVERRIDES: Record<string, string> = {
-  '8ec8a52f-c10e-4d58-90df-3df533c07034': 'San Jose, California, US',
-};
-
-function regionOverrideForClient(uuid: string): string {
-  return REGION_OVERRIDES[uuid] || '';
-}
   const candidates = values
     .map(value => nonUnknownRegion(value))
     .filter(Boolean);
   return candidates.find(value => !isCountryCodeRegion(value)) || candidates[0] || '';
+}
+
+function regionOverrideForClient(uuid: string): string {
+  if (uuid === '8ec8a52f-c10e-4d58-90df-3df533c07034') {
+    return 'San Jose, California, US';
+  }
+  return '';
 }
 
 function preferredPublicIp(reported: unknown, fallback = '', current = ''): string {
@@ -1128,8 +1128,8 @@ clientRoutes.post('/uploadBasicInfo', clientAuth, async (c) => {
       ...(inferredIpv6 !== undefined ? { ipv6: inferredIpv6 } : {}),
       region: regionOverrideForClient(uuid) || (
         ipChanged
-          ? preferredRegion(basicInfoPayload.region, edgeRegion, oldClient?.region)
-          : preferredRegion(basicInfoPayload.region, oldClient?.region, edgeRegion)
+          ? preferredRegion(body.region, edgeRegion, oldClient?.region)
+          : preferredRegion(body.region, oldClient?.region, edgeRegion)
       ),
       mem_total: positiveNumber(body.mem_total, oldClient?.mem_total || 0),
       swap_total: nonNegativeNumber(body.swap_total, oldClient?.swap_total || 0),
@@ -1291,3 +1291,4 @@ clientRoutes.post('/ping/result', clientIdentityAuth, async (c) => {
 });
 
 export { clientRoutes, clientAuth, clientIdentityAuth };
+
