@@ -461,6 +461,13 @@ function isCountryCodeRegion(value: string): boolean {
 }
 
 function preferredRegion(...values: unknown[]): string {
+  const REGION_OVERRIDES: Record<string, string> = {
+  '8ec8a52f-c10e-4d58-90df-3df533c07034': 'San Jose, California, US',
+};
+
+function regionOverrideForClient(uuid: string): string {
+  return REGION_OVERRIDES[uuid] || '';
+}
   const candidates = values
     .map(value => nonUnknownRegion(value))
     .filter(Boolean);
@@ -584,9 +591,11 @@ async function syncClientIpsFromReport(
     (nextIpv4 !== undefined && oldClient.ipv4 !== nextIpv4) ||
     (nextIpv6 !== undefined && oldClient.ipv6 !== nextIpv6);
   const edgeRegion = requestRegion(c);
-  const nextRegion = ipChanged
-    ? preferredRegion(report.region, edgeRegion, oldClient.region)
-    : preferredRegion(report.region, oldClient.region, edgeRegion);
+  const nextRegion = regionOverrideForClient(uuid) || (
+    ipChanged
+      ? preferredRegion(report.region, edgeRegion, oldClient.region)
+      : preferredRegion(report.region, oldClient.region, edgeRegion)
+  );
 
   const updates: Record<string, string> = {};
   if (nextIpv4 !== undefined && oldClient.ipv4 !== nextIpv4) updates.ipv4 = nextIpv4;
@@ -635,7 +644,7 @@ async function updateLiveReport(
         name,
         hidden,
         source_ip: requestClientIp(c),
-        region: requestRegion(c),
+        region: regionOverrideForClient(uuid) || requestRegion(c),
         ...reportBody,
         timestamp: nowMs,
         ttl_ms: liveReportTtlMs(report),
@@ -743,9 +752,11 @@ async function syncBasicInfoFromReportBatch(
     gpu_name: nonEmptyString(basicInfoPayload.gpu_name, oldClient?.gpu_name || ''),
     ...(inferredIpv4 !== undefined ? { ipv4: inferredIpv4 } : {}),
     ...(inferredIpv6 !== undefined ? { ipv6: inferredIpv6 } : {}),
-    region: ipChanged
-      ? preferredRegion(basicInfoPayload.region, edgeRegion, oldClient?.region)
-      : preferredRegion(basicInfoPayload.region, oldClient?.region, edgeRegion),
+    region: regionOverrideForClient(uuid) || (
+      ipChanged
+        ? preferredRegion(basicInfoPayload.region, edgeRegion, oldClient?.region)
+        : preferredRegion(basicInfoPayload.region, oldClient?.region, edgeRegion)
+    ),
     mem_total: positiveNumber(basicInfoPayload.mem_total, oldClient?.mem_total || 0),
     swap_total: nonNegativeNumber(basicInfoPayload.swap_total, oldClient?.swap_total || 0),
     disk_total: positiveNumber(basicInfoPayload.disk_total, oldClient?.disk_total || 0),
@@ -1115,9 +1126,11 @@ clientRoutes.post('/uploadBasicInfo', clientAuth, async (c) => {
       gpu_name: nonEmptyString(body.gpu_name, oldClient?.gpu_name || ''),
       ...(inferredIpv4 !== undefined ? { ipv4: inferredIpv4 } : {}),
       ...(inferredIpv6 !== undefined ? { ipv6: inferredIpv6 } : {}),
-      region: ipChanged
-        ? preferredRegion(body.region, edgeRegion, oldClient?.region)
-        : preferredRegion(body.region, oldClient?.region, edgeRegion),
+      region: regionOverrideForClient(uuid) || (
+        ipChanged
+          ? preferredRegion(basicInfoPayload.region, edgeRegion, oldClient?.region)
+          : preferredRegion(basicInfoPayload.region, oldClient?.region, edgeRegion)
+      ),
       mem_total: positiveNumber(body.mem_total, oldClient?.mem_total || 0),
       swap_total: nonNegativeNumber(body.swap_total, oldClient?.swap_total || 0),
       disk_total: positiveNumber(body.disk_total, oldClient?.disk_total || 0),
